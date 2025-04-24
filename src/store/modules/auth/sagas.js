@@ -10,9 +10,9 @@ import { func } from 'prop-types';
 
 
 function* loginRequest({ payload }) {
-  try{
-    const response = yield call(axios.post,'/tokens', payload)
-    yield put(actions.loginSuccess( {...response.data}))
+  try {
+    const response = yield call(axios.post, '/tokens', payload)
+    yield put(actions.loginSuccess({ ...response.data }))
 
     toast.success('Você está logado!')
     console.log(response.data)
@@ -21,52 +21,60 @@ function* loginRequest({ payload }) {
 
     history.push(payload.prevPath)
 
-  }catch(e){
+  } catch (e) {
     toast.error('Usuário ou senha inválidos')
 
     yield put(actions.loginFailure())
   }
 }
 
-function persisteRehydrate({payload}){
+function persisteRehydrate({ payload }) {
   const token = get(payload, 'auth.token')
   if (!token) return;
   axios.defaults.headers.Authorization = `Bearer ${token}`
 }
 
-function* registerRequest({payload}){
-const { id, nome, email, password} = payload
+function* registerRequest({ payload }) {
+  const { id, nome, email, password } = payload
 
-console.log('1')
-try{
-  if(id){
-    console.log('1')
-    yield call(axios.put, '/users',{
-      email,
-      nome,
-      password:password || undefined,
-    })
-    toast.success('Conta alterada com sucesso')
-    yield put(actions.registerSuccess({nome, email, password}))
+  try {
+    if (id) {
+      yield call(axios.put, '/users', {
+        email,
+        nome,
+        password: password || undefined,
+      })
+      toast.success('Conta alterada com sucesso')
+      yield put(actions.registerUpdatedSuccess({ nome, email, password }))
+    } else {
+      yield call(axios.post, '/users', {
+        email,
+        nome,
+        password,
+      })
+      toast.success('Conta criada com sucesso')
+      yield put(actions.registerCreatedSuccess({ nome, email, password }))
+      history.push('/login')
+
+    }
+  } catch (e) {
+    const errors = get(e, 'response.data.errors', [])
+    const status = get(e, 'response.status', 0)
+    if(status ===401){
+      toast.error('Voce precisa fazer login novamente!')
+      yield put(actions.loginFailure())
+      return history.push('/login')
+    }
+    if (errors.length > 0) {
+
+      errors.map(error => toast.error(error))
+    } else {
+      toast.error('Erro desconhecido')
+    }
+
+    yield put(actions.registerFailure())
   }
-}catch(e){
-  console.log('2')
-  const errors = get(e, 'response.data.errors', [])
-  const status = get(e, 'response.status', 0)
-  if(errors.length>0){
-  console.log('3')
-  
-  errors.map(error=> toast.error(error))
-}else{
-  toast.error('Erro desconhecido')
 }
-
-
-yield put(actions.registerFailure)
-}
-}
-
-
 
 export default function* auth() {
   yield all([
